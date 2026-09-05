@@ -6,7 +6,7 @@
   "scripts": {
     "catalog": "node scripts/generate-catalog.mjs",
     "catalog:refresh": "node scripts/refresh-catalog.mjs",
-    "test": "node --test",
-    "verify": "node --test && node scripts/verify-catalog.mjs"
+    "test": "node --test tests/catalog.test.mjs",
+    "verify": "npm test && node scripts/verify-catalog.mjs"
   }
 }
