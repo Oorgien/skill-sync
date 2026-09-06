@@ -1,8 +1,0 @@
-[submodule "ECC"]
-	path = ECC
-	url = git@github.com:Oorgien/ECC.git
-	branch = main
-[submodule "skills"]
-	path = skills
-	url = git@github.com:mattpocock/skills.git
-	branch = main

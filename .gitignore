@@ -3,3 +3,6 @@ node_modules/
 .ai/*.local.yaml
 .agents/skills/
 .claude/skills/
+.skill-sources/
+
+__pycache__
