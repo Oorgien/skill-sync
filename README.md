@@ -1,76 +1,76 @@
 # skill-sync
 
-Одна команда, которая по YAML-манифесту раскладывает [Agent Skills](https://code.claude.com/docs/en/skills) в проект: скачивает источники (GitHub / npx / локальные) в общий кэш и создаёт симлинки в `.agents/skills/`.
+A single command that installs [Agent Skills](https://code.claude.com/docs/en/skills) into a project from a YAML manifest: it fetches sources (GitHub / npx / local) into a shared cache and creates symlinks in `.agents/skills/`.
 
-## Как это работает
+## How it works
 
-1. Читается манифест — список нужных skills.
-2. Каждый внешний источник скачивается в общий кэш (`.skill-sources/`) и переиспользуется всеми проектами.
-3. На каждый skill создаётся симлинк `<project>/.agents/skills/<name>` → папка с `SKILL.md` внутри источника.
-4. `<project>/.claude/skills` линкуется на `../.agents/skills` — Claude Code читает skills именно оттуда, а не из `.agents/skills/` напрямую.
-5. По умолчанию — сухой прогон (печатается план). Запись на диск только с флагом `--apply`.
+1. Reads the manifest — a list of the skills you need.
+2. Downloads each external source into a shared cache (`.skill-sources/`) for reuse across projects.
+3. Creates a symlink for each skill: `<project>/.agents/skills/<name>` → the folder containing `SKILL.md` within the source.
+4. Links `<project>/.claude/skills` to `../.agents/skills` — Claude Code reads skills from there rather than directly from `.agents/skills/`.
+5. Runs in dry-run mode by default (prints the plan). Writes to disk only with `--apply`.
 
-Скрипт не перезаписывает настоящие каталоги и чужие симлинки ни в `.agents/skills/`, ни в `.claude/skills`.
+The script does not overwrite real directories or symlinks it does not manage in either `.agents/skills/` or `.claude/skills`.
 
-## Требования и установка
+## Requirements and installation
 
 - Python ≥ 3.9
-- пакет `pyyaml`
-- `git` — для источников `github.com:…`
-- `node` + `npx` — только если используются источники `npx/…`
+- The `pyyaml` package
+- `git` — for `github.com:…` sources
+- `node` + `npx` — only when using `npx/…` sources
 
-Проект собирается через `hatchling` (см. `pyproject.toml`). Варианты:
+The project uses `hatchling` to build (see `pyproject.toml`). Installation options:
 
 ```bash
-# uv: поставить как консольную команду `skill-sync`
+# uv: install as the `skill-sync` command
 uv tool install .
 skill-sync --project /path/to/project --apply
 
-# или dev-окружение
-uv sync            # + dev-группа: pytest, ruff, mypy
+# Or set up a development environment
+uv sync            # Includes the dev group: pytest, ruff, mypy
 uv run skill-sync --project /path/to/project --apply
 
-# или pip
+# Or use pip
 pip install -e .
 skill-sync --project /path/to/project --apply
 ```
 
-Можно и без установки — это один файл, зависящий только от `pyyaml`:
+You can also run it without installing the project — it is a single file that depends only on `pyyaml`:
 
 ```bash
 pip install pyyaml
 python3 skill_sync.py --project /path/to/project --apply
 ```
 
-Точка входа `skill-sync` эквивалентна `python3 skill_sync.py`.
+The `skill-sync` entry point is equivalent to `python3 skill_sync.py`.
 
-## Манифест
+## Manifest
 
-YAML-файл. По умолчанию берётся `config.yaml` из каталога `--project`; другой путь — через `--config`.
+A YAML file. By default, the script uses `config.yaml` from the `--project` directory; specify a different path with `--config`.
 
 ```yaml
 skills:
   common:
-    - github.com:addyosmani/agent-skills:all      # все skills из репозитория
-    - github.com:owner/repo:some-skill            # один конкретный skill
-    - personal:my-skill                           # из custom-skills/my-skill/ рядом со скриптом
-    - npx/ecc-universal:ecc-guide                 # селективная установка через npx
+    - github.com:addyosmani/agent-skills:all      # All skills from the repository
+    - github.com:owner/repo:some-skill            # One specific skill
+    - personal:my-skill                           # From custom-skills/my-skill/ next to the script
+    - npx/ecc-universal:ecc-guide                 # Selective installation via npx
   codex: []
   claude: []
 ```
 
-Секции `common`, `codex`, `claude` объединяются в один общий пул (без фильтрации по агенту).
+The `common`, `codex`, and `claude` sections are merged into one shared pool (without filtering by agent).
 
-Формы записи источника:
+Source formats:
 
-| Форма | Значение |
+| Format | Meaning |
 | --- | --- |
-| `github.com:<owner/repo>:<skill>` | один skill из репозитория |
-| `github.com:<owner/repo>:all` | все найденные skills репозитория |
-| `personal:<name>` | локальный skill из `custom-skills/<name>/` рядом со скриптом |
-| `npx/<package>:<skill>` | `npx <package> install --skills <skill>`, переносится только этот skill |
+| `github.com:<owner/repo>:<skill>` | One skill from the repository |
+| `github.com:<owner/repo>:all` | All skills found in the repository |
+| `personal:<name>` | A local skill from `custom-skills/<name>/` next to the script |
+| `npx/<package>:<skill>` | Runs `npx <package> install --skills <skill>`; copies only that skill |
 
-Поддерживается развёрнутая форма:
+An expanded form is also supported:
 
 ```yaml
 skills:
@@ -83,68 +83,68 @@ skills:
       - my-skill
 ```
 
-`github` — синоним `github.com` (только как ключ в развёрнутой форме; в строковом
-селекторе нужен полный `github.com:`). `all` с `npx` не поддерживается.
+`github` is an alias for `github.com` (only as a key in the expanded form; string
+selectors require the full `github.com:` prefix). `all` is not supported with `npx`.
 
-Имя skill берётся из имени папки с `SKILL.md`. Источник сканируется в подкаталоге `skills/`, если он есть, иначе от корня. Недопустимые имена папок и дубликаты имён приводят к ошибке.
+The skill name comes from the name of the folder containing `SKILL.md`. The script scans the source's `skills/` subdirectory if it exists, otherwise it scans from the root. Invalid folder names and duplicate names cause an error.
 
-## Применение
+## Usage
 
 ```bash
-# план: ничего не качает и не пишет
+# Print the plan: no downloads or writes
 python3 skill_sync.py --project /path/to/project
 
-# скачать источники и создать симлинки
+# Download sources and create symlinks
 python3 skill_sync.py --project /path/to/project --apply
 
-# подтянуть обновления уже скачанных источников (git pull --ff-only / переустановка)
+# Update previously downloaded sources (git pull --ff-only / reinstall)
 python3 skill_sync.py --project /path/to/project --apply --update
 
-# убрать симлинки, которых больше нет в манифесте (только созданные этим инструментом)
+# Remove symlinks no longer listed in the manifest (only those created by this tool)
 python3 skill_sync.py --project /path/to/project --apply --prune
 ```
 
-| Флаг | Назначение |
+| Flag | Purpose |
 | --- | --- |
-| `--project <path>` | целевой проект; по умолчанию — текущая папка |
-| `--config <path>` | путь к манифесту; по умолчанию `<project>/config.yaml` |
-| `--apply` | единственный флаг, который скачивает и пишет на диск |
-| `--update` | обновить кэш и подхватить skills, добавленные в источник после прошлого запуска |
-| `--prune` | удалить из `.agents/skills/` управляемые симлинки, пропавшие из манифеста |
-| `--cache-dir <path>` | где хранить кэш источников (см. ниже) |
+| `--project <path>` | Target project; defaults to the current directory |
+| `--config <path>` | Path to the manifest; defaults to `<project>/config.yaml` |
+| `--apply` | The only flag that enables downloads and disk writes |
+| `--update` | Refresh the cache and pick up skills added to the source since the last run |
+| `--prune` | Remove managed symlinks from `.agents/skills/` that are no longer in the manifest |
+| `--cache-dir <path>` | Location of the source cache (see below) |
 
-## Общий кэш источников
+## Shared source cache
 
-Скачанные GitHub/npx-источники лежат в одном кэше и переиспользуются всеми проектами.
-Расположение (в порядке приоритета):
+Downloaded GitHub/npx sources are stored in a single cache and reused across projects.
+The location is determined in this order of priority:
 
-1. флаг `--cache-dir <path>`
-2. переменная окружения `SKILL_SYNC_CACHE`
-3. по умолчанию — `.skill-sources/` рядом со `skill_sync.py`
+1. The `--cache-dir <path>` flag
+2. The `SKILL_SYNC_CACHE` environment variable
+3. By default, `.skill-sources/` next to `skill_sync.py`
 
 ```bash
 export SKILL_SYNC_CACHE="$HOME/.cache/agent-skills"
 ```
 
-## Что появляется в проекте
+## Files created in the project
 
 ```text
-.agents/skills/<name>       # симлинк на папку со SKILL.md внутри источника
-.claude/skills               # симлинк -> ../.agents/skills, чтобы skills видел Claude Code
+.agents/skills/<name>       # Symlink to the folder containing SKILL.md within the source
+.claude/skills               # Symlink -> ../.agents/skills so Claude Code can find the skills
 ```
 
-Кэш (`.skill-sources/<source>/<owner%2Frepo>/`) лежит в общем месте, а не в проекте.
+The cache (`.skill-sources/<source>/<owner%2Frepo>/`) lives in a shared location rather than in the project.
 
-В `.gitignore` целевого проекта стоит добавить:
+Add the following to the target project's `.gitignore`:
 
 ```gitignore
 .agents/skills/
 .claude/skills/
 ```
 
-## Поведение при повторных запусках
+## Behavior on subsequent runs
 
-- Нужный симлинк уже на месте → пропускается (идемпотентно).
-- По целевому пути лежит настоящий файл или чужой симлинк → ошибка, ничего не меняется.
-- Источник ещё не скачан и запуск без `--apply` → строка `Missing source (run with --apply)`.
-- Для `github.com` при `--update`: сначала `git pull --ff-only`, при неудаче — повторное клонирование.
+- The required symlink is already in place → skipped (idempotent).
+- A real file or a symlink not managed by the tool exists at the target path → error; nothing is changed.
+- The source has not been downloaded and the run does not use `--apply` → prints `Missing source (run with --apply)`.
+- For `github.com` with `--update`: tries `git pull --ff-only` first; if it fails, clones the repository again.

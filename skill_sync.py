@@ -27,7 +27,7 @@ class Entry(NamedTuple):
 
 
 def parse_entry(val: Any) -> list[Entry]:
-    """Разворачивает строку или дерево (dict/list) в список Entry."""
+    """Expand a string or a tree (dict/list) into a list of Entry objects."""
     if isinstance(val, str):
         parts = val.split(":")
         if val.startswith("personal:") and len(parts) == 2:
@@ -74,7 +74,7 @@ def parse_entry(val: Any) -> list[Entry]:
 
 
 def discover_skills(root: Path) -> dict[str, Path]:
-    """Ищет папки с SKILL.md."""
+    """Find folders containing SKILL.md."""
     scan = (root / "skills") if (root / "skills").is_dir() else root
     found = {}
     for skill_file in scan.rglob("SKILL.md"):
@@ -126,7 +126,7 @@ def resolve_source(
     apply: bool,
     update: bool = False,
 ) -> Path | None:
-    """Возвращает путь к исходнику навыка, при необходимости скачивая или обновляя его."""
+    """Return the path to the skill source, downloading or updating it if needed."""
     if entry.source == "personal":
         return hub_root / "custom-skills"
     assert entry.repo is not None
@@ -142,15 +142,15 @@ def resolve_source(
         raise ValueError("npx sources require explicit skill name")
 
     if entry.source == "github.com" and cache.is_dir():
-        # Уже клонировано: пробуем просто подтянуть новые коммиты (там могут
-        # появиться новые skills), а не качать репозиторий заново.
+        # Already cloned: try pulling new commits (which may include new skills)
+        # instead of downloading the repository again.
         pulled = subprocess.run(["git", "-C", str(cache), "pull", "--ff-only"]).returncode == 0
         still_missing = entry.skill != "all" and entry.skill not in discover_skills(cache)
         if pulled and not still_missing:
             return cache
-        # git pull не получился (например, история переписана force-push'ем),
-        # либо skill всё ещё не найден (например, локально что-то удалили) —
-        # выкачиваем репозиторий заново.
+        # git pull failed (for example, history was rewritten by a force push),
+        # or the skill is still missing (for example, files were deleted locally).
+        # Download the repository again.
         _download_github(entry, cache)
         return cache
 
@@ -168,10 +168,10 @@ def prune_managed_links(
     keep: set[str],
     apply: bool,
 ) -> int:
-    """Удаляет из .agents/skills симлинки, созданные этим инструментом, но пропавшие из манифеста.
+    """Remove tool-managed symlinks from .agents/skills that are no longer in the manifest.
 
-    Трогаются только ссылки, ведущие в кэш источников или в custom-skills/ хаба;
-    настоящие каталоги и «чужие» симлинки не затрагиваются.
+    Only links pointing into the source cache or the hub's custom-skills/ are affected;
+    real directories and symlinks not managed by this tool are left untouched.
     """
     skills_dir = project_root / ".agents" / "skills"
     if not skills_dir.is_dir():
@@ -198,9 +198,9 @@ def prune_managed_links(
 
 
 def ensure_claude_skills_link(project_root: Path, apply: bool) -> None:
-    """Claude Code читает skills из <project>/.claude/skills, а не из .agents/skills.
+    """Claude Code reads skills from <project>/.claude/skills, not .agents/skills.
 
-    Поддерживаем там симлинк на общий пул: <project>/.claude/skills -> ../.agents/skills.
+    Maintain a symlink to the shared pool: <project>/.claude/skills -> ../.agents/skills.
     """
     agents_skills = project_root / ".agents" / "skills"
     claude_dir = project_root / ".claude"
@@ -208,7 +208,7 @@ def ensure_claude_skills_link(project_root: Path, apply: bool) -> None:
     rel_source = Path("..") / ".agents" / "skills"
 
     if target_link.is_symlink() and target_link.resolve() == agents_skills.resolve():
-        return  # уже на месте, ничего печатать не нужно
+        return  # Already in place; nothing to print.
 
     print(f"{'Link' if apply else 'Would link'} {target_link} -> {rel_source}")
     if not apply:
@@ -225,21 +225,21 @@ def main() -> None:
         "--config",
         type=Path,
         default=None,
-        help="Путь к YAML-манифесту. По умолчанию — config.yaml в --project (текущей папке проекта).",
+        help="Path to the YAML manifest. Defaults to config.yaml in --project (the current project directory).",
     )
     parser.add_argument(
         "--project",
         type=Path,
         default=Path.cwd(),
-        help="Проект, в который устанавливаются skills. По умолчанию — текущая папка.",
+        help="Project to install skills into. Defaults to the current directory.",
     )
     parser.add_argument(
         "--cache-dir",
         type=Path,
         default=None,
         help=(
-            "Общий кэш скачанных источников (github/npx). По умолчанию — $SKILL_SYNC_CACHE, "
-            "иначе .skill-sources/ рядом с этим скриптом (хабом). Один кэш на все проекты."
+            "Shared cache for downloaded sources (github/npx). Defaults to $SKILL_SYNC_CACHE, "
+            "or .skill-sources/ next to this script (the hub). One cache for all projects."
         ),
     )
     parser.add_argument("--apply", action="store_true", help="Download and symlink skills")
@@ -266,8 +266,8 @@ def main() -> None:
     config_path = args.config if args.config is not None else project_root / "config.yaml"
     if not config_path.is_file():
         raise ValueError(
-            f"Config not found: {config_path}. Скопируйте config.yaml из хаба в {project_root}, "
-            "либо укажите путь через --config."
+            f"Config not found: {config_path}. Copy config.yaml from the hub to {project_root}, "
+            "or specify its path with --config."
         )
     data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
     skills_sec = data.get("skills") or {}
@@ -275,11 +275,11 @@ def main() -> None:
     links: dict[Path, Path] = {}
     missing: list[Entry] = []
 
-    # Один и тот же источник (github-репозиторий / npm-пакет) может встречаться в
-    # манифесте многократно — по строке на каждый нужный из него skill. Резолвим
-    # его лишь однажды за запуск, иначе с --update на каждую строку летит
-    # отдельный `git pull` по одному и тому же клону. Для npx skill влияет на
-    # скачивание, поэтому он входит в ключ; для github — нет.
+    # The same source (GitHub repository / npm package) may appear multiple times
+    # in the manifest, once for each requested skill. Resolve it only once per run
+    # to avoid a separate `git pull` on the same clone for every entry with --update.
+    # For npx, the skill affects the download, so it is part of the key;
+    # for GitHub, it is not.
     resolved: dict[tuple[str, str | None, str | None], Path | None] = {}
 
     for agent in ("common", "codex", "claude"):
@@ -332,9 +332,9 @@ def main() -> None:
                 continue
             raw = Path(os.readlink(target))
             cur = (raw if raw.is_absolute() else target.parent / raw).resolve()
-            # Свой же симлинк, который ведёт в кэш источников или в custom-skills/,
-            # но указывает не туда (сменился каталог кэша) либо стал битым —
-            # пересоздаём. Чужие симлинки не трогаем.
+            # Recreate a managed symlink into the source cache or custom-skills/
+            # if it points to the wrong location (the cache directory changed)
+            # or is broken. Leave symlinks not managed by this tool untouched.
             if not target.exists() or any(
                 cur == r or cur.is_relative_to(r) for r in managed_roots
             ):

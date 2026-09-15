@@ -1,67 +1,67 @@
-# skill-sync manifest — аннотированный справочник со всеми поддерживаемыми формами.
+# skill-sync manifest — an annotated reference for all supported formats.
 #
-# Запуск:
+# Usage:
 #   python3 skill_sync.py --project /path/to/project --apply
 #
-# По умолчанию скрипт ищет этот файл как `config.yaml` в каталоге --project.
-# Другой путь — через --config. Скопируйте этот шаблон в проект и оставьте
-# только нужные строки.
+# By default, the script looks for this file as `config.yaml` in the --project directory.
+# Use --config to specify a different path. Copy this template into your project
+# and keep only the entries you need.
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# ЧТО НАСТРАИВАЕТСЯ ФАЙЛОМ: только ключ `skills` (см. ниже).
+# CONFIGURED IN THIS FILE: only the `skills` key (see below).
 #
-# ЧТО НАСТРАИВАЕТСЯ ФЛАГАМИ / ОКРУЖЕНИЕМ (в файл не выносится):
-#   --project <path>     целевой проект, куда кладутся симлинки; по умолчанию CWD
-#   --config <path>      путь к этому файлу; по умолчанию <project>/config.yaml
-#   --apply              реально скачать источники и создать симлинки
-#                        (без него — сухой прогон, только печать плана)
-#   --update             обновить уже скачанные источники: git pull --ff-only,
-#                        при неудаче — повторное клонирование; подхватывает
-#                        skills, добавленные в источник после прошлого запуска
-#   --prune              удалить из <project>/.agents/skills те управляемые
-#                        симлинки, которых больше нет в манифесте
-#   --cache-dir <path>   каталог общего кэша скачанных источников
-#   SKILL_SYNC_CACHE     то же, что --cache-dir, но через переменную окружения
-#                        Приоритет: --cache-dir > $SKILL_SYNC_CACHE >
-#                        <каталог skill_sync.py>/.skill-sources
+# CONFIGURED VIA FLAGS / ENVIRONMENT (not stored in this file):
+#   --project <path>     target project where symlinks are created; defaults to CWD
+#   --config <path>      path to this file; defaults to <project>/config.yaml
+#   --apply              download sources and create symlinks
+#                        (without it, a dry run only prints the plan)
+#   --update             update downloaded sources using git pull --ff-only;
+#                        clone again if that fails; pick up skills added to
+#                        the source since the last run
+#   --prune              remove managed symlinks from <project>/.agents/skills
+#                        that are no longer listed in the manifest
+#   --cache-dir <path>   directory for the shared cache of downloaded sources
+#   SKILL_SYNC_CACHE     same as --cache-dir, but set via an environment variable
+#                        Priority: --cache-dir > $SKILL_SYNC_CACHE >
+#                        <skill_sync.py directory>/.skill-sources
 # ─────────────────────────────────────────────────────────────────────────────
 
 skills:
-  # Три секции: common, codex, claude. Их содержимое объединяется в один общий
-  # пул — деление носит организационный смысл, фильтрации по агенту в этой
-  # версии нет. Любая секция может быть пустой ([]) или отсутствовать.
+  # Three sections: common, codex, claude. Their contents are merged into one
+  # shared pool — the sections are for organization only; this version does not
+  # filter by agent. Any section can be empty ([]) or omitted.
 
   common:
-    # ── Строковые селекторы ────────────────────────────────────────────────
+    # ── String selectors ──────────────────────────────────────────────────
 
-    # Все skills репозитория (рекурсивно ищутся папки со SKILL.md; если есть
-    # подкаталог skills/, сканируется он, иначе — корень репозитория):
+    # All skills in a repository (recursively searches for folders containing
+    # SKILL.md; scans the skills/ subdirectory if present, otherwise the repository root):
     - github.com:addyosmani/agent-skills:all
 
-    # Один конкретный skill из репозитория:
+    # One specific skill from a repository:
     - github.com:anthropics/skills:pdf
 
-    # Ещё один репозиторий целиком:
+    # Another entire repository:
     - github.com:obra/superpowers:all
 
-    # Личный skill из custom-skills/<name>/ рядом со скриптом.
-    # (Закомментировано: требует реальной папки custom-skills/my-internal-skill/,
-    #  иначе запуск падает с ошибкой.)
+    # A personal skill from custom-skills/<name>/ next to the script.
+    # (Commented out: requires an actual custom-skills/my-internal-skill/ folder;
+    #  otherwise the run fails with an error.)
     # - personal:my-internal-skill
 
-    # Установка через npx: `npx <package> install --skills <skill>`.
-    # Имя skill обязательно — `all` с npx не поддерживается:
+    # Installation via npx: `npx <package> install --skills <skill>`.
+    # The skill name is required — `all` is not supported with npx:
     - npx/ecc-universal:ecc-guide
 
   codex:
-    # ── Развёрнутая (dict) форма ───────────────────────────────────────────
-    # Удобна, когда из одного источника нужно несколько skills.
+    # ── Expanded (dict) form ───────────────────────────────────────────────
+    # Useful when you need multiple skills from the same source.
 
-    # Ключ можно писать как `github.com` или короче `github` (только в dict-форме):
+    # The key can be `github.com` or the shorter `github` (dict form only):
     - github:
-        # либо строкой "owner/repo:skill"
+        # Either a string: "owner/repo:skill"
         - vercel-labs/skills:find-skills
-        # либо "owner/repo" -> список skills
+        # Or "owner/repo" -> a list of skills
         - anthropics/skills:
             - pdf
             - docx
@@ -74,5 +74,5 @@ skills:
     - npx:
         - ecc-universal:ecc-guide
 
-  # Пустая секция — допустимо:
+  # An empty section is allowed:
   claude: []
