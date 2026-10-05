@@ -6,3 +6,9 @@ node_modules/
 .skill-sources/
 
 __pycache__
+
+
+# agent-system:begin
+/.agents/
+/.claude/skills
+# agent-system:end
