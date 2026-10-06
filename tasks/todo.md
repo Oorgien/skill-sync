@@ -157,15 +157,15 @@ for `.agents/skills/<name>` and the `.claude/skills` link. `cli.py` runs manifes
 engine → git exclude. Old links without a state record are adopted; prune goes through state.
 
 **Acceptance criteria:**
-- [ ] All task 1 tests pass unchanged.
-- [ ] The state file lists every skill link. The exclude block lists every link, the state and lock
+- [x] All task 1 tests pass unchanged.
+- [x] The state file lists every skill link. The exclude block lists every link, the state and lock
       files, and `.claude/skills` if agent-sync created it.
-- [ ] A project with old links and no state: the first `--apply` adopts them and makes 0 link
+- [x] A project with old links and no state: the first `--apply` adopts them and makes 0 link
       changes. Prune never removes `.claude/skills`. Adoption never takes over a `.claude/skills`
       symlink that points anywhere other than `../.agents/skills` (pinned in task 1).
-- [ ] Only `cli.py` prints (SPEC-core "Code style"); `kinds/skills.py` returns operations
+- [x] Only `cli.py` prints (SPEC-core "Code style"); `kinds/skills.py` returns operations
       instead of printing (checkpoint A review).
-- [ ] From the checkpoint B review: the planner always emits the `.claude/skills` op, even for an
+- [x] From the checkpoint B review: the planner always emits the `.claude/skills` op, even for an
       empty skills list (otherwise `--prune` removes it); `adopt` is set only for symlinks into the
       cache or `custom-skills/` and for dangling skill links (tested, including that a real folder
       at a skill target is still a conflict); `sync_exclude(apply=False)` runs before the engine
@@ -189,11 +189,11 @@ engine → git exclude. Old links without a state record are adopted; prune goes
 the new flags, covering skills only; the other kinds are documented in their own slices.
 
 **Acceptance criteria:**
-- [ ] Each step of the cache precedence is tested; `personal:` without a personal folder gives an
+- [x] Each step of the cache precedence is tested; `personal:` without a personal folder gives an
       error that says how to set one.
-- [ ] With `HOME` empty and the cache set elsewhere, a full run leaves `HOME` empty; the exit code is
+- [x] With `HOME` empty and the cache set elsewhere, a full run leaves `HOME` empty; the exit code is
       0 on success and 1 on any error.
-- [ ] `README.md` and `config.yaml` mention only `agent-sync`, never `skill_sync.py`, and no
+- [x] `README.md` and `config.yaml` mention only `agent-sync`, never `skill_sync.py`, and no
       longer say "next to the script" (checkpoint A review: `README.md:56`, `:70`,
       `config.yaml:47`). `--help` shows `agent-sync` as the program name, also under
       `python -m agent_sync`.
@@ -207,9 +207,9 @@ the new flags, covering skills only; the other kinds are documented in their own
 **Estimated scope:** M
 
 ## Checkpoint C
-- [ ] Full suite, ruff and mypy pass
-- [ ] Manual: on a copy of `test-for-agent-system` with its `skills.yaml` and
+- [x] Full suite, ruff and mypy pass
+- [x] Manual: on a copy of `test-for-agent-system` with its `skills.yaml` and
       `SKILL_SYNC_CACHE=~/.cache/agent-skills`, the links match today's; a second run reports
       0 changes
-- [ ] Reviewer agent: whole slice against SPEC-core's success criteria
-- [ ] Report to the owner; commit 3 after their OK
+- [x] Reviewer agent: whole slice against SPEC-core's success criteria
+- [x] Report to the owner; commit 3 after their OK

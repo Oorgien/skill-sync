@@ -114,20 +114,49 @@ def _download_npx(entry: Entry, cache: Path) -> None:
         shutil.copytree(skills[0], dest, dirs_exist_ok=True)
 
 
+def check_personal_dir(personal_dir: Path | None) -> Path:
+    """The personal folder, or an error saying how to set one."""
+    if personal_dir is None:
+        raise ValueError(
+            "'personal:' entries need a personal folder: pass --personal-dir <path> "
+            "or set $AGENT_SYNC_PERSONAL."
+        )
+    if not personal_dir.is_dir():
+        raise ValueError(
+            f"Personal folder not found: {personal_dir}. "
+            "Create it, or point --personal-dir / $AGENT_SYNC_PERSONAL at an existing folder."
+        )
+    return personal_dir
+
+
+def _cache_path(entry: Entry, cache_root: Path) -> Path:
+    assert entry.repo is not None
+    return cache_root / entry.source / entry.repo.replace("/", "%2F")
+
+
+def _has_skill(entry: Entry, cache: Path) -> bool:
+    return cache.is_dir() and (entry.skill == "all" or entry.skill in discover_skills(cache))
+
+
+def will_refresh(entry: Entry, cache_root: Path, apply: bool, update: bool) -> bool:
+    """True if resolve_source would pull or download this (non-personal) source right now."""
+    if not apply:
+        return False
+    return update or not _has_skill(entry, _cache_path(entry, cache_root))
+
+
 def resolve_source(
     entry: Entry,
-    hub_root: Path,
+    personal_dir: Path | None,
     cache_root: Path,
     apply: bool,
     update: bool = False,
 ) -> Path | None:
     """Return the path to the skill source, downloading or updating it if needed."""
     if entry.source == "personal":
-        return hub_root / "custom-skills"
-    assert entry.repo is not None
-
-    cache = cache_root / entry.source / entry.repo.replace("/", "%2F")
-    has_skill = cache.is_dir() and (entry.skill == "all" or entry.skill in discover_skills(cache))
+        return check_personal_dir(personal_dir)
+    cache = _cache_path(entry, cache_root)
+    has_skill = _has_skill(entry, cache)
 
     if has_skill and not update:
         return cache

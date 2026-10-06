@@ -56,7 +56,10 @@ class Op(NamedTuple):
     source: str = ""  # manifest selector that produced it, recorded in the state
     payload: Any = None  # link: link text; write: bytes or {relative POSIX path: bytes}
     locator: Locator | None = None  # entry inside a shared file; None = the whole path
-    adopt: bool = False  # take over an identical or different path that has no record
+    # adopt: the planner vouches for an unrecorded SYMLINK (link: record or relink it; remove:
+    # delete it). It never applies to a real file or folder, with or without --force.
+    adopt: bool = False
+    hint: str = ""  # planner's extra advice, appended to a "Target already exists" conflict
 
 
 class Change(NamedTuple):
@@ -242,11 +245,17 @@ def _edited(target: str) -> str:
     return f"{target} was changed since agent-sync wrote it; delete it or re-run with --force"
 
 
-def _foreign(target: str) -> str:
-    return (
-        f"{target} exists and was not created by agent-sync; "
+def _foreign(project: Path, op: Op) -> str:
+    text = (
+        f"Target already exists: {project / op.target} (not created by agent-sync); "
         "move or delete it (--force never touches it)"
     )
+    return f"{text}. {op.hint}" if op.hint else text
+
+
+def _may_adopt(project: Path, op: Op) -> bool:
+    """Adoption is only ever for a symlink; a real file or folder is the user's."""
+    return op.adopt and (project / op.target).is_symlink()
 
 
 def _folder_conflict(project: Path, state: State, op: Op) -> Conflict | None:
@@ -285,8 +294,8 @@ def _check_write(project: Path, state: State, op: Op, force: bool) -> Change | C
         if force:
             return Change(op, "replace")
         return Conflict(op, status, _edited(op.target))
-    if not op.adopt:
-        return Conflict(op, status, _foreign(op.target))
+    if not _may_adopt(project, op):
+        return Conflict(op, status, _foreign(project, op))
     if fingerprint_path(project / op.target) == desired:
         return Change(op, "adopt")
     return Change(op, "replace")
@@ -303,7 +312,9 @@ def _check_remove(project: Path, state: State, op: Op, force: bool) -> Change | 
         return Change(op, "remove")
     if status is Status.OWNED_EDITED:
         return Conflict(op, status, _edited(op.target))
-    return Conflict(op, status, _foreign(op.target))
+    if _may_adopt(project, op):
+        return Change(op, "remove")  # the planner vouched for it (an old install's link)
+    return Conflict(op, status, _foreign(project, op))
 
 
 def check(project: Path, state: State, ops: Sequence[Op], *, force: bool) -> list[Change]:

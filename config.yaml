@@ -3,33 +3,41 @@
 # Usage:
 #   agent-sync --project /path/to/project --apply
 #
-# By default, the script looks for this file as `config.yaml` in the --project directory.
-# Use --config to specify a different path. Copy this template into your project
-# and keep only the entries you need.
+# By default, agent-sync looks for this file as `config.yaml` in the --project directory.
+# Use --config to specify a different path (a relative path is resolved against the
+# current directory). Copy this template into your project and keep only what you need.
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# CONFIGURED IN THIS FILE: only the `skills` key (see below).
+# CONFIGURED IN THIS FILE: only the `skills` key (see below). The keys agents,
+# commands, rules, hooks and mcp are planned; a non-empty one is an error
+# ("<kind> is not supported yet"). See CAPABILITY-MAP.md.
 #
 # CONFIGURED VIA FLAGS / ENVIRONMENT (not stored in this file):
-#   --project <path>     target project where symlinks are created; defaults to CWD
-#   --config <path>      path to this file; defaults to <project>/config.yaml
-#   --apply              download sources and create symlinks
-#                        (without it, a dry run only prints the plan)
-#   --update             update downloaded sources using git pull --ff-only;
-#                        clone again if that fails; pick up skills added to
-#                        the source since the last run
-#   --prune              remove managed symlinks from <project>/.agents/skills
-#                        that are no longer listed in the manifest
-#   --cache-dir <path>   directory for the shared cache of downloaded sources
-#   SKILL_SYNC_CACHE     same as --cache-dir, but set via an environment variable
-#                        Priority: --cache-dir > $SKILL_SYNC_CACHE >
-#                        <agent_sync package parent directory>/.skill-sources
+#   --project <path>       target project where links are created; defaults to CWD
+#   --config <path>        path to this file; defaults to <project>/config.yaml
+#   --apply                download sources and create links
+#                          (without it, a dry run only prints the plan)
+#   --update               update downloaded sources using git pull --ff-only;
+#                          clone again if that fails; pick up skills added to
+#                          the source since the last run
+#   --prune                remove links agent-sync created that are no longer
+#                          listed in the manifest
+#   --force                overwrite or prune items agent-sync created that you
+#                          edited; never touches anything agent-sync did not create
+#   --cache-dir <path>     directory for the shared cache of downloaded sources
+#                          Order: --cache-dir > $AGENT_SYNC_CACHE >
+#                          $SKILL_SYNC_CACHE > $XDG_CACHE_HOME/agent-sync >
+#                          ~/.cache/agent-sync
+#   --personal-dir <path>  folder with your own skills, for `personal:<name>`
+#                          Order: --personal-dir > $AGENT_SYNC_PERSONAL
+#                          (no default). Its skills/ subfolder is scanned if it
+#                          exists, otherwise its root: <folder>/<name>/SKILL.md
 # ─────────────────────────────────────────────────────────────────────────────
 
 skills:
   # Three sections: common, codex, claude. Their contents are merged into one
-  # shared pool — the sections are for organization only; this version does not
-  # filter by agent. Any section can be empty ([]) or omitted.
+  # shared pool — the sections are for organization only; skills are not
+  # filtered by agent. Any section can be empty ([]) or omitted.
 
   common:
     # ── String selectors ──────────────────────────────────────────────────
@@ -44,9 +52,9 @@ skills:
     # Another entire repository:
     - github.com:obra/superpowers:all
 
-    # A personal skill from custom-skills/<name>/ next to the script.
-    # (Commented out: requires an actual custom-skills/my-internal-skill/ folder;
-    #  otherwise the run fails with an error.)
+    # A personal skill from <personal folder>/my-internal-skill/.
+    # (Commented out: needs --personal-dir or $AGENT_SYNC_PERSONAL and an actual
+    #  my-internal-skill/SKILL.md in that folder; otherwise the run fails with an error.)
     # - personal:my-internal-skill
 
     # Installation via npx: `npx <package> install --skills <skill>`.

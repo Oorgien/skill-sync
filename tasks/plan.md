@@ -62,12 +62,12 @@ Move skill-sync into the `agent_sync` package and rebuild it on the core engine 
       2 review fix rounds)
 
 ### Phase 3: Skills on core
-- [ ] Task 7: Skills on the engine
-- [ ] Task 8: CLI options, locations and docs
+- [x] Task 7: Skills on the engine
+- [x] Task 8: CLI options, locations and docs
 
 ### Checkpoint C → reviewer → manual run → your OK → commit 3
-- [ ] Full suite, ruff and mypy pass
-- [ ] Manual: on a copy of `test-for-agent-system` with its `skills.yaml`, the result matches
+- [x] Full suite, ruff and mypy pass
+- [x] Manual: on a copy of `test-for-agent-system` with its `skills.yaml`, the result matches
       today's links; a second run reports 0 changes
 
 ## Risks and mitigations

@@ -397,7 +397,9 @@ def test_foreign_path_is_never_touched(tmp_path: Path, force: bool) -> None:
         ("d", Status.NOT_OURS),
         ("l", Status.NOT_OURS),
     ]
-    assert all("was not created by agent-sync" in c.reason for c in found)
+    assert all(c.reason.startswith("Target already exists: ") for c in found)
+    assert all("not created by agent-sync" in c.reason for c in found)
+    assert all(str(tmp_path / c.op.target) in c.reason for c in found)
     assert tree_snapshot(tmp_path) == before
 
 
@@ -408,6 +410,47 @@ def test_explicit_remove_of_a_foreign_path_is_a_conflict(tmp_path: Path, force: 
         do_apply(tmp_path, [remove_op("f")], force=force)
     assert conflicts_of(exc)[0].status is Status.NOT_OURS
     assert (tmp_path / "f").read_bytes() == b"theirs"
+
+
+@pytest.mark.parametrize("force", [False, True])
+def test_adopt_remove_of_a_foreign_link_removes_it_because_the_planner_asked(
+    tmp_path: Path, force: bool
+) -> None:
+    (tmp_path / "d").mkdir()
+    (tmp_path / "d" / "l").symlink_to("gone")
+    op = remove_op("d/l", adopt=True)
+    result = do_apply(tmp_path, [op], force=force)
+    assert result.changes == (Change(op, "remove"),)
+    assert not os.path.lexists(tmp_path / "d" / "l")
+    assert result.state.items == ()
+
+
+def test_remove_without_adopt_stays_a_conflict_and_touches_nothing(tmp_path: Path) -> None:
+    (tmp_path / "l").symlink_to("gone")
+    with pytest.raises(PlanError) as exc:
+        do_apply(tmp_path, [remove_op("l")])
+    assert conflicts_of(exc)[0].status is Status.NOT_OURS
+    assert os.readlink(tmp_path / "l") == "gone"
+    assert not (tmp_path / STATE_FILE).exists()
+
+
+def test_adopt_remove_of_an_absent_path_is_a_no_op(tmp_path: Path) -> None:
+    assert do_apply(tmp_path, [remove_op("l", adopt=True)]).changes == ()
+
+
+def test_adopt_remove_does_not_take_over_a_folder_agent_sync_created(tmp_path: Path) -> None:
+    do_apply(tmp_path, [file_op("out/f")])
+    with pytest.raises(PlanError):
+        do_apply(tmp_path, [remove_op("out", adopt=True)], force=True)
+    assert (tmp_path / "out" / "f").exists()
+
+
+def test_adopt_remove_of_an_edited_owned_item_still_needs_force(tmp_path: Path) -> None:
+    do_apply(tmp_path, [file_op("f", b"mine")])
+    (tmp_path / "f").write_bytes(b"edited")
+    with pytest.raises(PlanError):
+        do_apply(tmp_path, [remove_op("f", adopt=True)])
+    assert (tmp_path / "f").read_bytes() == b"edited"
 
 
 # --- adoption -------------------------------------------------------------------------------
@@ -426,15 +469,37 @@ def test_adopt_identical_link_only_records_it(tmp_path: Path) -> None:
     assert do_apply(tmp_path, [op]).changes == ()
 
 
-def test_adopt_identical_file_and_tree_only_record_them(tmp_path: Path) -> None:
-    (tmp_path / "f").write_bytes(b"same")
+@pytest.mark.parametrize("force", [False, True])
+@pytest.mark.parametrize("kind", ["file", "folder"])
+@pytest.mark.parametrize("action", ["link", "remove"])
+def test_adopt_only_ever_takes_over_a_symlink(
+    tmp_path: Path, action: str, kind: str, force: bool
+) -> None:
+    """A real file or folder is the user's, whatever the planner says and with or without --force."""
+    if kind == "file":
+        (tmp_path / "t").write_bytes(b"same")
+    else:
+        (tmp_path / "t").mkdir()
+        (tmp_path / "t" / "a").write_bytes(b"1")
+    before = tree_snapshot(tmp_path)
+    op = link_op("t", "x", adopt=True) if action == "link" else remove_op("t", adopt=True)
+    with pytest.raises(PlanError) as exc:
+        do_apply(tmp_path, [op], force=force)
+    (found,) = conflicts_of(exc)
+    assert found.status is Status.NOT_OURS
+    assert found.reason.startswith("Target already exists: ")
+    assert tree_snapshot(tmp_path) == before
+    assert not (tmp_path / STATE_FILE).exists()
+
+
+@pytest.mark.parametrize("make", ["file", "tree"])
+def test_adopt_on_a_write_op_over_a_real_path_is_a_conflict(tmp_path: Path, make: str) -> None:
     (tmp_path / "t").mkdir()
     (tmp_path / "t" / "a").write_bytes(b"1")
-    ops = [file_op("f", b"same", adopt=True), tree_op("t", {"a": b"1"}, adopt=True)]
-    result = do_apply(tmp_path, ops)
-    assert [c.effect for c in result.changes] == ["adopt", "adopt"]
-    assert_state_matches_disk(tmp_path)
-    assert targets(result.state) == {"f", "t"}
+    op = tree_op("t", {"a": b"1"}, adopt=True) if make == "tree" else file_op("t", adopt=True)
+    with pytest.raises(PlanError):
+        do_apply(tmp_path, [op])
+    assert (tmp_path / "t" / "a").read_bytes() == b"1"
 
 
 def test_adopt_different_content_replaces_it(tmp_path: Path) -> None:
@@ -1239,16 +1304,21 @@ def test_a_failed_swap_puts_the_old_folder_back(
 # --- fix round: adopt onto a real folder ----------------------------------------------------
 
 
-def test_adopt_replaces_a_real_folder_the_planner_decides_when_that_is_allowed(
-    tmp_path: Path,
-) -> None:
+def test_adopt_does_not_replace_a_real_folder(tmp_path: Path) -> None:
     (tmp_path / "skill").mkdir()
     (tmp_path / "skill/mine.md").write_bytes(b"user")
-    op = link_op("skill", "../cache/skill", adopt=True)
-    result = do_apply(tmp_path, [op])
-    assert result.changes == (Change(op, "replace"),)
-    assert os.readlink(tmp_path / "skill") == "../cache/skill"
-    assert_state_matches_disk(tmp_path)
+    with pytest.raises(PlanError):
+        do_apply(tmp_path, [link_op("skill", "../cache/skill", adopt=True)], force=True)
+    assert (tmp_path / "skill/mine.md").read_bytes() == b"user"
+
+
+def test_a_conflict_carries_the_planners_hint(tmp_path: Path) -> None:
+    (tmp_path / "t").mkdir()
+    with pytest.raises(PlanError) as exc:
+        do_apply(tmp_path, [link_op("t", hint="Do the other thing.")])
+    reason = conflicts_of(exc)[0].reason
+    assert reason.startswith("Target already exists: ")
+    assert reason.endswith("Do the other thing.")
 
 
 # --- fix round 2: folder rollback, adopt re-check, bookkeeping files ------------------------
@@ -1293,15 +1363,16 @@ def test_a_failing_record_save_while_creating_folders_rolls_back_too(
 
 
 def test_adopt_records_nothing_if_the_content_changed_since_the_check(tmp_path: Path) -> None:
-    (tmp_path / "f").write_bytes(b"same")
-    op = file_op("f", b"same", adopt=True)
+    (tmp_path / "f").symlink_to("same")
+    op = link_op("f", "same", adopt=True)
     changes = check(tmp_path, State(()), [op], force=False)
     assert changes == [Change(op, "adopt")]
-    (tmp_path / "f").write_bytes(b"changed in between")
+    (tmp_path / "f").unlink()
+    (tmp_path / "f").symlink_to("changed in between")
     with pytest.raises(RuntimeError, match="changed since"):
         _apply_changes(tmp_path, State(()), changes)
     assert not (tmp_path / STATE_FILE).exists()
-    assert (tmp_path / "f").read_bytes() == b"changed in between"
+    assert os.readlink(tmp_path / "f") == "changed in between"
 
 
 @pytest.mark.parametrize("name", [LOCK_FILE.name, STATE_FILE.name])
