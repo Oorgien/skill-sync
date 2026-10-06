@@ -66,11 +66,11 @@ delete `skill_sync.py`.
 grammar. `hooks` mappings are passed through unparsed.
 
 **Acceptance criteria:**
-- [ ] Today's manifests, including the repo's `config.yaml`, produce the same skill entries as
+- [x] Today's manifests, including the repo's `config.yaml`, produce the same skill entries as
       before.
-- [ ] An unknown top-level key or section, or `npx/` under any kind except `skills`, is an error
+- [x] An unknown top-level key or section, or `npx/` under any kind except `skills`, is an error
       that names it.
-- [ ] Harness resolution: `common` gives both, `claude`/`codex` give one; `skills` and `commands`
+- [x] Harness resolution: `common` gives both, `claude`/`codex` give one; `skills` and `commands`
       are one pool.
 
 **Verification:** `uv run pytest tests/test_manifest.py -q`, plus ruff and mypy
@@ -89,9 +89,9 @@ non-blocking `flock` on `.agents/agent-sync.lock`, and classifies a target as ab
 owned-unchanged, owned-edited or not-ours.
 
 **Acceptance criteria:**
-- [ ] Load/save round-trips; an unknown `version` is an error.
-- [ ] The classification is tested for files, folder trees, symlinks and entries.
-- [ ] A second run while the lock is held fails at once with "another agent-sync run is in
+- [x] Load/save round-trips; an unknown `version` is an error.
+- [x] The classification is tested for files, folder trees, symlinks and entries.
+- [x] A second run while the lock is held fails at once with "another agent-sync run is in
       progress"; it doesn't hang.
 
 **Verification:** `uv run pytest tests/test_state.py -q`, plus ruff and mypy
@@ -110,11 +110,11 @@ saves state after every operation, and computes prune operations from items in s
 no longer produces. `merge` raises `NotImplementedError` until the hooks and mcp slices.
 
 **Acceptance criteria:**
-- [ ] A conflict anywhere in the plan, including the last operation, means nothing is written.
-- [ ] Applying the same plan twice: the second run executes 0 operations.
-- [ ] An edited item errors without `--force` and is overwritten or pruned with it; something not
+- [x] A conflict anywhere in the plan, including the last operation, means nothing is written.
+- [x] Applying the same plan twice: the second run executes 0 operations.
+- [x] An edited item errors without `--force` and is overwritten or pruned with it; something not
       owned is never touched, even with `--force`.
-- [ ] A failure injected after operation k leaves a state file that matches the disk. Folders the
+- [x] A failure injected after operation k leaves a state file that matches the disk. Folders the
       engine created are removed once empty.
 
 **Verification:** `uv run pytest tests/test_engine.py -q`, plus ruff and mypy
@@ -132,10 +132,10 @@ no longer produces. `merge` raises `NotImplementedError` until the hooks and mcp
 entries, and skips with a note outside git.
 
 **Acceptance criteria:**
-- [ ] Lines outside the block are untouched; the block is created, updated, and removed when it
+- [x] Lines outside the block are untouched; the block is created, updated, and removed when it
       becomes empty.
-- [ ] Works in a linked worktree (the test creates one).
-- [ ] A project that isn't a git repository gets a note, not an error.
+- [x] Works in a linked worktree (the test creates one).
+- [x] A project that isn't a git repository gets a note, not an error.
 
 **Verification:** `uv run pytest tests/test_gitexclude.py -q`, plus ruff and mypy
 
@@ -146,9 +146,9 @@ entries, and skips with a note outside git.
 **Estimated scope:** S
 
 ## Checkpoint B
-- [ ] Tasks 3–6 checks pass; pinned tests still pass
-- [ ] Reviewer agent: engine matches SPEC-core (all-or-nothing, ownership, `--force`, prune)
-- [ ] Report to the owner; commit 2 after their OK
+- [x] Tasks 3–6 checks pass; pinned tests still pass
+- [x] Reviewer agent: engine matches SPEC-core (all-or-nothing, ownership, `--force`, prune)
+- [x] Report to the owner; commit 2 after their OK
 
 ## Task 7: Skills on the engine
 
@@ -165,6 +165,12 @@ engine → git exclude. Old links without a state record are adopted; prune goes
       symlink that points anywhere other than `../.agents/skills` (pinned in task 1).
 - [ ] Only `cli.py` prints (SPEC-core "Code style"); `kinds/skills.py` returns operations
       instead of printing (checkpoint A review).
+- [ ] From the checkpoint B review: the planner always emits the `.claude/skills` op, even for an
+      empty skills list (otherwise `--prune` removes it); `adopt` is set only for symlinks into the
+      cache or `custom-skills/` and for dangling skill links (tested, including that a real folder
+      at a skill target is still a conflict); `sync_exclude(apply=False)` runs before the engine
+      applies, so a broken exclude block fails before anything is written; `dir` items are never
+      passed to `sync_exclude`.
 
 **Verification:** `uv run pytest -q`, plus ruff and mypy
 

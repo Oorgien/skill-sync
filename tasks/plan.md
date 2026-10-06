@@ -27,7 +27,9 @@ Move skill-sync into the `agent_sync` package and rebuild it on the core engine 
   may own the same link in projects that use it.
 - **Intended behavior changes** (not pinned by the tests): where `personal:` items come from
   (`--personal-dir`), the default cache location, all-or-nothing runs (today a conflict halfway
-  through can leave earlier links written), the summary line wording, and the command name.
+  through can leave earlier links written), the summary line wording, the command name, and
+  names that differ only by letter case (accepted on Linux today, rejected everywhere now, so a
+  run on macOS can't fail halfway).
 
 ## Who does what
 
@@ -50,13 +52,14 @@ Move skill-sync into the `agent_sync` package and rebuild it on the core engine 
       works; ruff and mypy are clean
 
 ### Phase 2: Core
-- [ ] Task 3: Manifest format v2
-- [ ] Task 4: Ownership state
-- [ ] Task 5: Engine: plan validation, apply, prune
-- [ ] Task 6: Git exclude block
+- [x] Task 3: Manifest format v2
+- [x] Task 4: Ownership state
+- [x] Task 5: Engine: plan validation, apply, prune
+- [x] Task 6: Git exclude block
 
 ### Checkpoint B → reviewer → your OK → commit 2
-- [ ] Unit and integration tests for core pass; pinned tests still pass
+- [x] Unit and integration tests for core pass; pinned tests still pass (339 tests after
+      2 review fix rounds)
 
 ### Phase 3: Skills on core
 - [ ] Task 7: Skills on the engine
