@@ -1,7 +1,7 @@
-# skill-sync manifest — an annotated reference for all supported formats.
+# agent-sync manifest — an annotated reference for all supported formats.
 #
 # Usage:
-#   python3 skill_sync.py --project /path/to/project --apply
+#   agent-sync --project /path/to/project --apply
 #
 # By default, the script looks for this file as `config.yaml` in the --project directory.
 # Use --config to specify a different path. Copy this template into your project
@@ -23,7 +23,7 @@
 #   --cache-dir <path>   directory for the shared cache of downloaded sources
 #   SKILL_SYNC_CACHE     same as --cache-dir, but set via an environment variable
 #                        Priority: --cache-dir > $SKILL_SYNC_CACHE >
-#                        <skill_sync.py directory>/.skill-sources
+#                        <agent_sync package parent directory>/.skill-sources
 # ─────────────────────────────────────────────────────────────────────────────
 
 skills:

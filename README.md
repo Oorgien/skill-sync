@@ -1,4 +1,4 @@
-# skill-sync
+# agent-sync
 
 A single command that installs [Agent Skills](https://code.claude.com/docs/en/skills) into a project from a YAML manifest: it fetches sources (GitHub / npx / local) into a shared cache and creates symlinks in `.agents/skills/`.
 
@@ -22,27 +22,27 @@ The script does not overwrite real directories or symlinks it does not manage in
 The project uses `hatchling` to build (see `pyproject.toml`). Installation options:
 
 ```bash
-# uv: install as the `skill-sync` command
+# uv: install as the `agent-sync` command
 uv tool install .
-skill-sync --project /path/to/project --apply
+agent-sync --project /path/to/project --apply
 
 # Or set up a development environment
 uv sync            # Includes the dev group: pytest, ruff, mypy
-uv run skill-sync --project /path/to/project --apply
+uv run agent-sync --project /path/to/project --apply
 
 # Or use pip
 pip install -e .
-skill-sync --project /path/to/project --apply
+agent-sync --project /path/to/project --apply
 ```
 
-You can also run it without installing the project — it is a single file that depends only on `pyyaml`:
+You can also run it without installing the project — the `agent_sync` package depends only on `pyyaml`. Run it from the repository root:
 
 ```bash
 pip install pyyaml
-python3 skill_sync.py --project /path/to/project --apply
+python -m agent_sync --project /path/to/project --apply
 ```
 
-The `skill-sync` entry point is equivalent to `python3 skill_sync.py`.
+The `agent-sync` entry point is equivalent to `python -m agent_sync`.
 
 ## Manifest
 
@@ -92,16 +92,16 @@ The skill name comes from the name of the folder containing `SKILL.md`. The scri
 
 ```bash
 # Print the plan: no downloads or writes
-python3 skill_sync.py --project /path/to/project
+python -m agent_sync --project /path/to/project
 
 # Download sources and create symlinks
-python3 skill_sync.py --project /path/to/project --apply
+python -m agent_sync --project /path/to/project --apply
 
 # Update previously downloaded sources (git pull --ff-only / reinstall)
-python3 skill_sync.py --project /path/to/project --apply --update
+python -m agent_sync --project /path/to/project --apply --update
 
 # Remove symlinks no longer listed in the manifest (only those created by this tool)
-python3 skill_sync.py --project /path/to/project --apply --prune
+python -m agent_sync --project /path/to/project --apply --prune
 ```
 
 | Flag | Purpose |
@@ -120,7 +120,7 @@ The location is determined in this order of priority:
 
 1. The `--cache-dir <path>` flag
 2. The `SKILL_SYNC_CACHE` environment variable
-3. By default, `.skill-sources/` next to `skill_sync.py`
+3. By default, `.skill-sources/` next to the `agent_sync` package
 
 ```bash
 export SKILL_SYNC_CACHE="$HOME/.cache/agent-skills"
