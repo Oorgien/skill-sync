@@ -305,3 +305,22 @@ def test_invalid_github_repo_in_dict_form_names_kind_section_and_item() -> None:
 def test_npx_error_names_section_too() -> None:
     with pytest.raises(ValueError, match="rules.*codex|codex.*rules"):
         parse_manifest({"rules": {"codex": ["npx/pkg:x"]}})
+
+
+def test_inline_mcp_mapping_with_name_passes_through() -> None:
+    item = {"name": "github", "command": "npx", "args": ["-y", "gh"]}
+    (entry,) = parse_manifest({"mcp": {"claude": [item]}})
+    assert entry == ManifestEntry("mcp", CLAUDE, "", None, "github", item)
+    (common,) = parse_manifest({"mcp": {"common": [item]}})
+    assert common.harnesses == BOTH
+
+
+def test_mcp_selector_strings_still_use_the_selector_grammar() -> None:
+    (entry,) = parse_manifest({"mcp": {"codex": ["personal:srv"]}})
+    assert (entry.source, entry.repo, entry.name, entry.raw) == ("personal", None, "srv", None)
+
+
+@pytest.mark.parametrize("name", ["", "bad name", "-x", "a/b", 3])
+def test_inline_mcp_with_invalid_name_is_an_error(name: Any) -> None:
+    with pytest.raises(ValueError, match="Invalid mcp.claude item"):
+        parse_manifest({"mcp": {"claude": [{"name": name, "command": "x"}]}})

@@ -26,7 +26,7 @@ class ManifestEntry(NamedTuple):
     source: str  # "github.com" | "personal" | "npx" ("" for hooks)
     repo: str | None  # owner/repo or npm package; None for personal and hooks
     name: str  # item name, or "all"; "" for hooks
-    raw: Any = None  # hooks only: the raw mapping, unparsed
+    raw: Any = None  # hooks and inline mcp servers: the raw mapping, unparsed
 
 
 def _harnesses(kind: Kind, section: str) -> frozenset[Harness]:
@@ -43,6 +43,11 @@ def _parse_item(
         if not isinstance(item, dict):
             raise ValueError(f"Invalid {where}: expected a mapping")
         return [ManifestEntry(kind, harnesses, "", None, "", item)]
+    if kind == "mcp" and isinstance(item, dict) and "name" in item:
+        name = item["name"]
+        if not isinstance(name, str) or not NAME_RE.fullmatch(name):
+            raise ValueError(f"Invalid {where}: invalid item name {name!r}")
+        return [ManifestEntry(kind, harnesses, "", None, name, item)]
     try:
         parsed = parse_entry(item)
     except (AttributeError, TypeError, ValueError) as exc:

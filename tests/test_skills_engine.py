@@ -670,17 +670,15 @@ def test_force_does_not_touch_a_foreign_claude_skills(sandbox: Sandbox, kind: st
 # -- other kinds ----------------------------------------------------------------------------
 
 
-def test_a_manifest_with_mcp_is_not_supported_yet_and_writes_nothing(sandbox: Sandbox) -> None:
+def test_a_manifest_with_an_mcp_server_installs_it_together_with_skills(sandbox: Sandbox) -> None:
     sandbox.make_repo("owner/repo", ["alpha"])
-    sandbox.write_config(ALL + "mcp:\n  common:\n    - github.com:owner/repo:architect\n")
-    before = snapshot(sandbox.project)
+    sandbox.write_config(ALL + "mcp:\n  claude:\n    - {name: docs, command: node}\n")
 
     result = sandbox.sync("--apply")
 
-    assert result.returncode == 1
-    assert "mcp is not supported yet" in result.stderr
-    assert snapshot(sandbox.project) == before
-    assert not sandbox.cache.exists()
+    assert result.returncode == 0, result.stderr
+    assert sandbox.installed_skills() == ["alpha"]
+    assert (sandbox.project / ".mcp.json").is_file()
 
 
 def test_an_empty_section_of_another_kind_is_fine(sandbox: Sandbox) -> None:

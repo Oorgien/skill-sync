@@ -23,13 +23,8 @@ Later, after the modules above: `prefixes`, an optional per-source name prefix (
 such as `ecc-search-first`. It touches every kind's naming, and prefixed skills must be copied and
 rewritten instead of symlinked.
 
-Module specifications live locally in `specs/SPEC-<module id>.md` and are excluded from Git.
-They are working documents, not committed project documentation.
-
-Slice 1 (`core` + `skills`) is implemented. Slice 2 specifications are approved and kept locally
-as `specs/SPEC-agents.md`, `specs/SPEC-commands.md` and `specs/SPEC-rules.md` (not in Git).
-Slice 2 implements shared command skills for both harnesses, native-first agents and routed rules.
-Implementation is reviewed; see tasks/todo.md for validation and runtime limits.
+Module specifications and implementation plans are local working documents (`specs/`,
+`tasks/`), not in Git. This map is the committed overview of the design.
 
 ## Where each kind goes
 
@@ -53,8 +48,14 @@ Implementation is reviewed; see tasks/todo.md for validation and runtime limits.
   until external imports are approved, and path-scoped rules never load through it.
 - **Rules are routed by format, never converted.** Claude rules are Markdown instructions; Codex
   rules are a Starlark command-approval policy.
-- **Hooks are declared explicitly in the manifest**, with a `{source}` placeholder for the cached
-  source path. agent-sync does not import a source's `hooks.json`.
+- **Hooks** (2026-10-07, supersedes the 2026-10-05 rule): declared in the manifest with a `{source}`
+  placeholder, or picked one handler at a time from a source's native hook file (by `id`, or by
+  event + text match); a pick must match exactly one handler. A whole hook file is never imported.
+  If git tracks the target hook file (`.codex/hooks.json`, `.claude/settings.local.json`), the run
+  fails: agent-sync's hook commands contain paths into the local cache.
+- **MCP servers** (2026-10-07): native definitions first (`.mcp.json` for Claude,
+  `.codex/config.toml` for Codex), conversion only as a warned fallback, plus servers declared
+  inline. Environment values and auth headers must be variable references; a literal is an error.
 - **tomlkit** edits `.codex/config.toml`, keeping comments and formatting.
 - **Git:** every path agent-sync creates is listed in the repository's `info/exclude`.
 - **Codex trust:** Codex reads hooks, MCP servers and rules from `.codex/` only in trusted projects.

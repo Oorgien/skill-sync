@@ -273,8 +273,8 @@ def classify_path(project: Path, state: State, target: str) -> Status:
     if current is None:
         return Status.ABSENT
     item = state.find(target)
-    if item is not None and item.kind == "dir":
-        item = None  # a folder agent-sync created says nothing about what is inside it
+    if item is not None and item.kind in ("dir", "file"):
+        item = None  # a folder or file agent-sync created says nothing about what is inside it
     return _compare(item, current)
 
 

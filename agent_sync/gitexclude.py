@@ -180,3 +180,31 @@ def _write_atomic(exclude: Path, text: str) -> None:
         if os.path.exists(temp_name):
             os.unlink(temp_name)
         raise
+
+
+def is_tracked(project: Path, rel: str) -> bool:
+    """True if git tracks ``rel`` (relative to ``project``).
+
+    False when it is not tracked, outside a git repository, or without git. Any other git
+    failure (an unsafe repository owner, a broken index) is a ``ValueError`` carrying git's
+    message, so a tracked-file guard never passes silently.
+    """
+    try:
+        done = subprocess.run(
+            ["git", "ls-files", "--error-unmatch", "--", rel],
+            cwd=str(project),
+            capture_output=True,
+            check=False,
+            # English messages, so "not a git repository" is recognised on a localized git
+            env={**os.environ, "LC_ALL": "C", "LANG": "C", "LANGUAGE": "C"},
+        )
+    except OSError:
+        return False
+    if done.returncode == 0:
+        return True
+    if done.returncode == 1:
+        return False
+    message = done.stderr.decode("utf-8", "replace").strip()
+    if "not a git repository" in message:
+        return False
+    raise ValueError(f"git could not tell whether {rel} is tracked: {message or done.returncode}")

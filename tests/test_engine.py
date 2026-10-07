@@ -756,21 +756,6 @@ def test_overlapping_targets_are_rejected(tmp_path: Path) -> None:
         check(tmp_path, State(()), [file_op("t/x"), link_op("t")], force=False)
 
 
-def test_merge_is_not_implemented_yet(tmp_path: Path) -> None:
-    op = Op("merge", ".mcp.json", "mcp", locator=("mcpServers", "x"), payload={"command": "x"})
-    with pytest.raises(NotImplementedError, match="hooks and mcp slices"):
-        check(tmp_path, State(()), [op], force=False)
-    with pytest.raises(NotImplementedError, match="hooks and mcp slices"):
-        do_apply(tmp_path, [file_op("a"), op])
-    assert not (tmp_path / "a").exists()
-
-
-def test_remove_of_an_entry_inside_a_shared_file_is_not_implemented_yet(tmp_path: Path) -> None:
-    op = Op("remove", ".mcp.json", "mcp", locator=("mcpServers", "x"))
-    with pytest.raises(NotImplementedError, match="hooks and mcp slices"):
-        check(tmp_path, State(()), [op], force=False)
-
-
 @pytest.mark.parametrize(
     "op",
     [

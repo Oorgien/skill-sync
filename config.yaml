@@ -8,26 +8,27 @@
 # current directory). Copy this template into your project and keep only what you need.
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# SUPPORTED: skills, agents, commands and rules. Hooks and mcp remain planned.
+# SUPPORTED: skills, agents, commands, rules, hooks and mcp.
 # This sample keeps the additional kinds empty; uncomment selected examples below.
 #
 # CONFIGURED VIA FLAGS / ENVIRONMENT (not stored in this file):
-#   --project <path>       target project where links are created; defaults to CWD
+#   --project <path>       target project to install into; defaults to CWD
 #   --config <path>        path to this file; defaults to <project>/config.yaml
-#   --apply                download sources and create links
+#   --apply                download sources and install what the manifest lists
 #                          (without it, a dry run only prints the plan)
 #   --update               update downloaded sources using git pull --ff-only;
 #                          clone again if that fails; pick up skills added to
 #                          the source since the last run
-#   --prune                remove links agent-sync created that are no longer
-#                          listed in the manifest
+#   --prune                remove items agent-sync created (links, copies, hook groups,
+#                          MCP entries) that are no longer listed in the manifest
 #   --force                overwrite or prune items agent-sync created that you
 #                          edited; never touches anything agent-sync did not create
 #   --cache-dir <path>     directory for the shared cache of downloaded sources
 #                          Order: --cache-dir > $AGENT_SYNC_CACHE >
 #                          $SKILL_SYNC_CACHE > $XDG_CACHE_HOME/agent-sync >
 #                          ~/.cache/agent-sync
-#   --personal-dir <path>  folder with your own skills, for `personal:<name>`
+#   --personal-dir <path>  folder with your own sources, for `personal:<name>` entries
+#                          of any kind and hooks `source: personal`
 #                          Order: --personal-dir > $AGENT_SYNC_PERSONAL
 #                          (no default). Its skills/ subfolder is scanned if it
 #                          exists, otherwise its root: <folder>/<name>/SKILL.md
@@ -96,3 +97,44 @@ commands:
 # Named rule directories preserve their nested layout.
 rules:
   claude: []  # e.g. [github.com:affaan-m/ECC:common, github.com:affaan-m/ECC:python]
+
+# Hooks run code, so the dry run prints every command in full. Needs untracked
+# .claude/settings.local.json / .codex/hooks.json. A pick is harness-specific (not in common).
+hooks: {}
+# [example hooks]
+# hooks:
+#   common:
+#     - name: audit-log
+#       event: Stop
+#       command: "echo stopped >> .agent-audit.log"
+#   claude:
+#     - name: edit-guard
+#       source: github.com:acme/tools
+#       event: PreToolUse
+#       matcher: "Edit|Write"
+#       command: "node {source}/scripts/guard.js"   # {source} is quoted for you
+#       timeout: 30
+#     - name: desktop-notify
+#       source: github.com:acme/tools
+#       pick: { event: Stop, contains: "stop:desktop-notify" }
+#   codex:
+#     - name: session-start
+#       source: github.com:acme/tools
+#       pick: { id: "session:start" }
+# [/example]
+
+# MCP servers: references to environment variables only, never secrets.
+mcp: {}
+# [example mcp]
+# mcp:
+#   common:
+#     - github.com:acme/tools:docs
+#     - name: context7
+#       command: npx
+#       args: ["-y", "@upstash/context7-mcp"]
+#       env: [CONTEXT7_API_KEY]
+#   claude:
+#     - name: figma
+#       url: https://mcp.figma.com/mcp
+#       bearer_token_env: FIGMA_OAUTH_TOKEN
+# [/example]
