@@ -12,7 +12,11 @@ from agent_sync import engine
 from agent_sync.context import Context
 from agent_sync.engine import Change, Op
 from agent_sync.gitexclude import sync_exclude
-from agent_sync.kinds.skills import plan_skills
+from agent_sync.kinds.agents import plan_agents
+from agent_sync.kinds.commands import plan_commands
+from agent_sync.kinds.rules import plan_rules
+from agent_sync.kinds.skills import legacy_removals, plan_skills
+from agent_sync.kinds.source_files import KindPlan
 from agent_sync.manifest import load_manifest
 from agent_sync.sources import check_personal_dir
 from agent_sync.state import LOCK_FILE, STATE_FILE, State, load_state
@@ -51,8 +55,8 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agent-sync",
         description=(
-            "Install skills from a YAML manifest into a project: sources are fetched into a "
-            "shared cache and linked into .agents/skills. A dry run is the default; nothing is "
+            "Install skills, agents, commands and rules from a YAML manifest: sources use a "
+            "shared cache. A dry run is the default; nothing is "
             "written without --apply."
         ),
     )
@@ -60,7 +64,7 @@ def _parser() -> argparse.ArgumentParser:
         "--project",
         type=Path,
         default=Path.cwd(),
-        help="Project to install skills into. Defaults to the current directory.",
+        help="Project to install artifacts into. Defaults to the current directory.",
     )
     parser.add_argument(
         "--config",
@@ -91,7 +95,9 @@ def _parser() -> argparse.ArgumentParser:
             "$AGENT_SYNC_PERSONAL. There is no default."
         ),
     )
-    parser.add_argument("--apply", action="store_true", help="Download sources and link skills")
+    parser.add_argument(
+        "--apply", action="store_true", help="Download sources and install selected artifacts"
+    )
     parser.add_argument(
         "--update",
         action="store_true",
@@ -100,7 +106,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--prune",
         action="store_true",
-        help="Remove links agent-sync created that the manifest no longer lists",
+        help="Remove owned artifacts that the manifest no longer lists",
     )
     parser.add_argument(
         "--force",
@@ -128,7 +134,7 @@ def main() -> None:
 
     entries = load_manifest(config_path)
     for entry in entries:
-        if entry.kind != "skills":
+        if entry.kind in ("hooks", "mcp"):
             raise ValueError(f"{entry.kind} is not supported yet")
     if any(entry.source == "personal" for entry in entries):
         check_personal_dir(personal_dir)  # before any source is downloaded
@@ -142,7 +148,34 @@ def main() -> None:
         prune=args.prune,
         state=state,
     )
-    plan = plan_skills(entries, ctx)
+    # Resolve desired content before considering any legacy link deletion.
+    skill_plan = plan_skills([e for e in entries if e.kind == "skills"], ctx._replace(prune=False))
+    ops = list(skill_plan.ops)
+    missing = list(skill_plan.missing)
+    diagnostics: list[str] = []
+    for kind, planner in (
+        ("agents", plan_agents),
+        ("commands", plan_commands),
+        ("rules", plan_rules),
+    ):
+        part = planner([e for e in entries if e.kind == kind], ctx)
+        ops.extend(part.ops)
+        missing.extend(part.missing)
+        diagnostics.extend(part.diagnostics)
+    _check_shared_names(state, ops)
+    effective_prune = args.prune and not missing
+    if args.prune and missing:
+        diagnostics.append("Pruning skipped: source inventory is incomplete.")
+    if effective_prune:
+        ops.extend(legacy_removals(ctx, {op.target for op in ops}))
+    plan = KindPlan(ops, missing, diagnostics)
+    for diagnostic in plan.diagnostics:
+        print(diagnostic)
+    if any(op.harness == "codex" and op.kind in ("agents", "rules") for op in ops):
+        print(
+            "Codex project configuration may require project trust and a client restart; "
+            "agent-sync does not change trust settings."
+        )
 
     for entry in plan.missing:
         print(f"Missing source (run with --apply): {entry.source}/{entry.repo}")
@@ -150,19 +183,21 @@ def main() -> None:
     # Check the exclude block before the engine writes anything: a broken block or a bad path
     # then fails the whole run while the project is still untouched.
     would_be = _exclude_paths(
-        project_root, state, plan.ops, prune=args.prune, create_bookkeeping=args.apply
+        project_root, state, plan.ops, prune=effective_prune, create_bookkeeping=args.apply
     )
     checked = sync_exclude(project_root, would_be, apply=False)
 
-    result = engine.run(project_root, plan.ops, apply=args.apply, prune=args.prune, force=args.force)
+    result = engine.run(
+        project_root, plan.ops, apply=args.apply, prune=effective_prune, force=args.force
+    )
     for change in result.changes:
         print(_describe(change, project_root, args.apply))
-    print(_summary(result.changes, len(plan.missing), args.apply, args.prune))
+    print(_summary(result.changes, len(plan.missing), args.apply, effective_prune))
 
     if args.apply:
         # List the state and lock files only if the run really left them behind.
         paths = _exclude_paths(
-            project_root, state, plan.ops, prune=args.prune, create_bookkeeping=False
+            project_root, state, plan.ops, prune=effective_prune, create_bookkeeping=False
         )
         final = sync_exclude(project_root, paths, apply=True)
     else:
@@ -171,6 +206,25 @@ def main() -> None:
         print(final.note)
     elif final.changed:
         print(f"{'Update' if args.apply else 'Would update'} {final.path}")
+
+
+def _check_shared_names(state: State, ops: Sequence[Op]) -> None:
+    """A command never takes over a skill, including an owned or legacy skill link."""
+    seen: dict[str, str] = {}
+    for op in ops:
+        if op.kind not in ("skills", "commands") or op.target == ".claude/skills":
+            continue
+        previous = seen.setdefault(op.target.casefold(), op.kind)
+        recorded = state.find(op.target)
+        if previous != op.kind or (
+            recorded is not None
+            and recorded.kind in ("skills", "commands")
+            and recorded.kind != op.kind
+        ):
+            raise ValueError(
+                f"Collision for {op.target}: cannot switch skills/commands kind; "
+                "remove the old item in a separate prune run first"
+            )
 
 
 def _exclude_paths(

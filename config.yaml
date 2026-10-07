@@ -8,9 +8,8 @@
 # current directory). Copy this template into your project and keep only what you need.
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# CONFIGURED IN THIS FILE: only the `skills` key (see below). The keys agents,
-# commands, rules, hooks and mcp are planned; a non-empty one is an error
-# ("<kind> is not supported yet"). See CAPABILITY-MAP.md.
+# SUPPORTED: skills, agents, commands and rules. Hooks and mcp remain planned.
+# This sample keeps the additional kinds empty; uncomment selected examples below.
 #
 # CONFIGURED VIA FLAGS / ENVIRONMENT (not stored in this file):
 #   --project <path>       target project where links are created; defaults to CWD
@@ -84,3 +83,16 @@ skills:
 
   # An empty section is allowed:
   claude: []
+
+# Native definitions are preferred; Markdown agents can be converted for Codex.
+agents:
+  common: []  # e.g. [github.com:affaan-m/ECC:planner]
+  codex: []   # e.g. [github.com:affaan-m/ECC:docs-researcher]
+
+# Commands become explicit-invocation skills in the shared pool.
+commands:
+  common: []  # e.g. [github.com:affaan-m/ECC:plan]
+
+# Named rule directories preserve their nested layout.
+rules:
+  claude: []  # e.g. [github.com:affaan-m/ECC:common, github.com:affaan-m/ECC:python]

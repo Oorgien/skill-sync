@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "agent-sync"
 version = "0.1.0"
-description = "Sync and manage agent skills from YAML manifests into local project directories."
+description = "Sync skills, agents, commands and rules from YAML manifests into local projects."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
@@ -27,6 +27,7 @@ classifiers = [
 
 dependencies = [
     "pyyaml>=6.0",
+    "tomlkit>=0.13",
 ]
 
 [project.scripts]

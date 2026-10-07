@@ -23,8 +23,13 @@ Later, after the modules above: `prefixes`, an optional per-source name prefix (
 such as `ecc-search-first`. It touches every kind's naming, and prefixed skills must be copied and
 rewritten instead of symlinked.
 
-Each module has its own spec, `SPEC-<module id>.md`, next to this file. This map is the index of
-which specs exist.
+Module specifications live locally in `specs/SPEC-<module id>.md` and are excluded from Git.
+They are working documents, not committed project documentation.
+
+Slice 1 (`core` + `skills`) is implemented. Slice 2 specifications are approved and kept locally
+as `specs/SPEC-agents.md`, `specs/SPEC-commands.md` and `specs/SPEC-rules.md` (not in Git).
+Slice 2 implements shared command skills for both harnesses, native-first agents and routed rules.
+Implementation is reviewed; see tasks/todo.md for validation and runtime limits.
 
 ## Where each kind goes
 

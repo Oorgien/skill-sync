@@ -55,7 +55,7 @@ def plan_skills(entries: Sequence[ManifestEntry], ctx: Context) -> SkillsPlan:
     if claude is not None:
         ops.append(claude)
     if ctx.prune:
-        ops += _prune_old_installs(ctx, {op.target for op in ops})
+        ops += legacy_removals(ctx, {op.target for op in ops})
     return SkillsPlan(ops, missing)
 
 
@@ -196,7 +196,7 @@ def _skill_hint(ctx: Context, target: str) -> str:
     return LOOP_HINT if _destination(path) is None else OLD_INSTALL_HINT
 
 
-def _prune_old_installs(ctx: Context, planned: set[str]) -> list[Op]:
+def legacy_removals(ctx: Context, planned: set[str]) -> list[Op]:
     """``remove`` (adopt) for unrecorded links into a managed root that the plan no longer makes.
 
     Recorded items are pruned by the engine; real folders and links elsewhere are never touched.

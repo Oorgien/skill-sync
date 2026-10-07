@@ -2,7 +2,8 @@
 
 A single command that installs [Agent Skills](https://code.claude.com/docs/en/skills) into a project from a YAML manifest. It fetches sources (GitHub, npx or your own folder) into a shared cache and creates symlinks in `.agents/skills/`, so Claude Code and Codex both find them.
 
-Only skills are supported today. Agents, commands, rules, hooks and MCP servers are planned; see [CAPABILITY-MAP.md](CAPABILITY-MAP.md). The manifest already accepts those keys, but a non-empty one fails with `<kind> is not supported yet` (an empty section is fine).
+Skills, agents, commands and rules are supported. Hooks and MCP servers remain planned; non-empty
+`hooks` or `mcp` sections fail with `<kind> is not supported yet`. See [CAPABILITY-MAP.md](CAPABILITY-MAP.md).
 
 ## How it works
 
@@ -35,8 +36,8 @@ uv run agent-sync --project /path/to/project --apply
 pip install -e .
 agent-sync --project /path/to/project --apply
 
-# Or without installing the project; it only needs pyyaml
-pip install pyyaml
+# Or without installing the project
+pip install pyyaml tomlkit
 python -m agent_sync --project /path/to/project --apply
 ```
 
@@ -208,4 +209,54 @@ uv run ruff check .
 uv run mypy agent_sync tests
 ```
 
-Specs: [SPEC-core.md](SPEC-core.md) and [CAPABILITY-MAP.md](CAPABILITY-MAP.md).
+Roadmap: [CAPABILITY-MAP.md](CAPABILITY-MAP.md). Working specifications are kept locally in
+`specs/` and are not included in the repository.
+
+## Agents, commands and rules
+
+```yaml
+agents:
+  common:
+    - github.com:affaan-m/ECC:planner
+  codex:
+    - github.com:affaan-m/ECC:docs-researcher
+commands:
+  common:
+    - github.com:affaan-m/ECC:plan
+rules:
+  claude:
+    - github.com:affaan-m/ECC:common
+    - github.com:affaan-m/ECC:python
+```
+
+All kinds support GitHub and personal sources; npx remains skills-only. `all` selects all
+compatible items. Agents/rules sections target the named harness; commands and skills share
+one pool regardless of section. Missing inventories suppress pruning until sources are available.
+
+**Agents:** discover `agents/*.md`, `.claude/agents/*.md`, `agents/*.toml` and
+`.codex/agents/*.toml`. Claude receives native Markdown. Codex prefers native TOML and falls
+back to converting Markdown instructions. Legacy native fragments registered through the source's
+`.codex/config.toml` receive their role name and description as standalone metadata. Other native
+settings are retained. Conversion does not translate Claude model names or enforce Claude tool
+restrictions: diagnostics list omitted keys, and Codex inherits its own settings. Supply native
+TOML when exact Codex controls matter. Referenced resources that cannot be safely relocated are
+reported rather than silently producing a broken installation.
+
+**Commands:** discover immediate Markdown files in `commands/` or `.claude/commands/` and
+generate explicit-invocation skills for both harnesses. A command can explicitly declare
+`skill: existing-skill-name` in frontmatter to reuse a skill from the same source, including its
+resources. Matching names alone do not establish equivalence. Generated skills preserve command
+argument placeholders and include prompt-level guidance where substitution is unavailable;
+identical cross-client argument processing is not guaranteed. Claude-specific tools, models and
+dynamic context are not translated for Codex. A skill and command cannot share a target name;
+changing the kind requires a separate prune run removing the previous item.
+
+**Rules:** discover `rules/`, `.claude/rules/` and `.codex/rules/`. Route Markdown to Claude
+and `.rules` policies to Codex; never convert between them. Select a top-level file by stem or
+a group directory by name. Groups retain their relative paths and contents. Native project
+configuration may require Codex trust and a restart; agent-sync never changes user trust.
+
+New copied artifacts reject selected source symlinks and unsafe paths. Synchronization does
+not execute imported instructions, scripts or rules. Generated command directories are owned
+as whole trees: extra files count as edits and require `--force` before replacement or pruning.
+Ordinary skills remain linked to their complete source directories, retaining all resources.

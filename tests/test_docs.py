@@ -14,12 +14,12 @@ FENCE = re.compile(r"^```ya?ml\n(.*?)^```", re.DOTALL | re.MULTILINE)
 
 
 def readme_manifests() -> list[str]:
-    """Every yaml code block in the README that has a top-level `skills:` key."""
+    """Every yaml code block in the README that has a supported top-level kind."""
     blocks = FENCE.findall((ROOT / "README.md").read_text(encoding="utf-8"))
     found = []
     for block in blocks:
         data = yaml.safe_load(block)
-        if isinstance(data, dict) and "skills" in data:
+        if isinstance(data, dict) and any(kind in data for kind in ("skills", "agents", "commands", "rules")):
             found.append(block)
     return found
 

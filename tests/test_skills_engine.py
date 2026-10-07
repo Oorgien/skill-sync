@@ -670,15 +670,15 @@ def test_force_does_not_touch_a_foreign_claude_skills(sandbox: Sandbox, kind: st
 # -- other kinds ----------------------------------------------------------------------------
 
 
-def test_a_manifest_with_agents_is_not_supported_yet_and_writes_nothing(sandbox: Sandbox) -> None:
+def test_a_manifest_with_mcp_is_not_supported_yet_and_writes_nothing(sandbox: Sandbox) -> None:
     sandbox.make_repo("owner/repo", ["alpha"])
-    sandbox.write_config(ALL + "agents:\n  common:\n    - github.com:owner/repo:architect\n")
+    sandbox.write_config(ALL + "mcp:\n  common:\n    - github.com:owner/repo:architect\n")
     before = snapshot(sandbox.project)
 
     result = sandbox.sync("--apply")
 
     assert result.returncode == 1
-    assert "agents is not supported yet" in result.stderr
+    assert "mcp is not supported yet" in result.stderr
     assert snapshot(sandbox.project) == before
     assert not sandbox.cache.exists()
 

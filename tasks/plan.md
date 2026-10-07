@@ -1,87 +1,72 @@
-# Implementation Plan: agent-sync, slice 1 (core + skills)
+# Implementation plan: Slice 2 — agents, commands, rules
 
-## Overview
+Status: implemented and independently reviewed; commit approval pending. Product specifications approved 2026-10-06; local-only in
+`specs/SPEC-agents.md`, `specs/SPEC-commands.md`, `specs/SPEC-rules.md`.
+Completed Slice 1 plan/checklist archived locally as `specs/slice-1-*.md`.
 
-Move skill-sync into the `agent_sync` package and rebuild it on the core engine from
-[SPEC-core.md](../SPEC-core.md), without changing what a skills-only manifest installs. Later slices
-(agents, commands, rules, hooks, mcp) plug into this engine; see
-[CAPABILITY-MAP.md](../CAPABILITY-MAP.md). Tasks with full acceptance criteria are in
-[todo.md](todo.md).
+## Implementation order
 
-## Architecture decisions
+Build complete CLI paths sequentially: agents, commands, rules, then mixed-kind verification
+and documentation. Hooks and MCP remain unsupported. Detailed acceptance criteria: [todo.md](todo.md).
 
-- **Pin before moving.** Tests that capture today's behavior run first against the current
-  `skill_sync.py`, then against the package. They call the code through one adapter,
-  `tests/conftest.py::run_sync`, which is the only line that changes when the code moves.
-- **No test hooks in production code.** Tests redirect GitHub clones to local repos with git's
-  `url.<base>.insteadOf` (set via `GIT_CONFIG_*` environment variables), and put a fake `npx` on
-  `PATH`. This works unchanged for the old and the new code.
-- **Move first, then rebuild.** Task 2 is a mechanical move with identical behavior. The engine comes
-  after it, so the suite stays green at every step.
-- **`merge` operations arrive with their first users.** Core defines the `Op` and locator types
-  now; JSON merging is implemented in the hooks slice and TOML merging (with `tomlkit`) in the mcp
-  slice.
-- **Codex trust reminder arrives with the first slice that writes Codex hooks, MCP servers or
-  rules.** Core only provides the place to print it.
-- **`.claude/skills` link:** created if missing, as today, but never removed by prune. agent-system
-  may own the same link in projects that use it.
-- **Intended behavior changes** (not pinned by the tests): where `personal:` items come from
-  (`--personal-dir`), the default cache location, all-or-nothing runs (today a conflict halfway
-  through can leave earlier links written), the summary line wording, the command name, and
-  names that differ only by letter case (accepted on Linux today, rejected everywhere now, so a
-  run on macOS can't fail halfway).
+1. Discover agent sources safely and validate frontmatter.
+2. Copy/convert agents and integrate the first new planner into the CLI.
+3. Generate commands as explicit-invocation skills for both harnesses.
+4. Integrate command ownership, shared-name conflicts and safe pruning.
+5. Copy rule files and recursive named groups with format routing.
+6. Verify mixed-kind lifecycle and complete CLI behavior.
+7. Update documentation and inspect an isolated manual installation.
 
-## Who does what
+## Internal contracts
 
-- The implementer agent builds each task test-first: a failing test, then the code, then cleanup.
-- The main session checks each task's diff against its acceptance criteria before starting the next.
-- The reviewer agent reviews each phase at its checkpoint; at most 2–3 fix rounds per checkpoint.
-- At each checkpoint the main session reports to you and waits for your go-ahead, then commits.
-  No AI attribution lines in commit messages.
-- Tasks 3, 4 and 6 touch separate files and can run in parallel after task 2.
+- New planners return operations, missing entries and diagnostics; only the CLI prints.
+- Source discovery remains kind-specific. Reuse small proven source/metadata helpers, not a
+  generic plugin framework. Cache writes occur only under the existing apply/update contract.
+- Aggregate all kinds before exclusion validation and one engine invocation. A malformed final
+  item must prevent all earlier project writes.
+- Plan desired skills before legacy-link removals. Compute those removals only after every
+  desired target is known. This avoids removing a target selected by commands.
+- Missing source inventory suppresses both engine pruning and legacy-link pruning, with a
+  diagnostic. Exclusion calculations and summary output use the same effective prune flag.
+- Reject an existing skills/commands ownership-kind transition, even with force; require a
+  separate removal run. Never let generic engine replacement bypass the shared-name contract.
+- Add only the previously approved tomlkit dependency; retain Python >= 3.9 support.
 
-## Task list
+## Delivery and review
 
-### Phase 1: Safety net
-- [x] Task 1: Pin today's skill sync with tests (40 tests; 28 mutations tried, all caught after
-      two additions)
-- [x] Task 2: Move the code into the `agent_sync` package
+Use failing focused tests, minimal implementation, then refactoring with tests green.
+Implementer agents build tasks; a separate reviewer checks each checkpoint. The main session
+owns integration and acceptance checks. Shared files are edited sequentially.
 
-### Checkpoint A → reviewer → your OK → commit 1
-- [x] Pinned tests pass against the package (59 after review fix round 1); `agent-sync --help`
-      works; ruff and mypy are clean
+Checkpoint A follows agents; B follows commands and pruning; C follows rules, integration and
+docs. Run full tests, Ruff and strict mypy at each checkpoint and resolve reviewer findings.
+No commits without owner approval; specifications remain ignored and are never staged.
+Preserve the staged removal of root SPEC-core.md and unrelated TODOS.md/skills.yaml.
 
-### Phase 2: Core
-- [x] Task 3: Manifest format v2
-- [x] Task 4: Ownership state
-- [x] Task 5: Engine: plan validation, apply, prune
-- [x] Task 6: Git exclude block
+## Verification
 
-### Checkpoint B → reviewer → your OK → commit 2
-- [x] Unit and integration tests for core pass; pinned tests still pass (339 tests after
-      2 review fix rounds)
+```bash
+uv run pytest -q
+uv run ruff check .
+uv run mypy agent_sync tests
+git diff --exit-code -- tests/test_skills_pinned.py tests/test_skills_pinned_edges.py tests/test_harness.py tests/conftest.py
+git diff --check
+```
 
-### Phase 3: Skills on core
-- [x] Task 7: Skills on the engine
-- [x] Task 8: CLI options, locations and docs
-
-### Checkpoint C → reviewer → manual run → your OK → commit 3
-- [x] Full suite, ruff and mypy pass
-- [x] Manual: on a copy of `test-for-agent-system` with its `skills.yaml`, the result matches
-      today's links; a second run reports 0 changes
+Use local sources and the existing isolated-HOME subprocess harness. For the manual smoke run,
+install representative fixtures into a temporary project and verify byte contents and no-op
+reapply. Check client discovery/invocation metadata where local tooling permits without a paid
+model call. Record client versions and unavailable checks: serializer tests alone do not prove
+runtime behavior. Do not execute imported commands or rules.
 
 ## Risks and mitigations
 
-| Risk | Impact | Mitigation |
-|---|---|---|
-| The pinned tests miss a behavior you rely on | Med | Pin list built from the README's "Behavior on subsequent runs" and every branch in `main()`; the reviewer checks coverage against both |
-| The `insteadOf` redirect doesn't apply to `git clone --depth 1` | Low | Verified first thing in task 1 |
-| `flock` is POSIX-only | Low | macOS and Linux only, like today's symlinks; noted in the README |
-| Adopting old links takes over a link you made by hand into the cache | Low | Same rule today's `--prune` already uses |
-| Existing installs break after the rename | Med | `$SKILL_SYNC_CACHE` is still honoured; checked by the manual run at checkpoint C |
-| GateGuard stops the implementer on every new file | Med | Your call: exempt the skill-sync path or switch the gate off for this work |
+| Risk | Mitigation |
+|---|---|
+| Claude agent permissions do not translate | Loss diagnostics; native TOML preference; no permission-equivalence claim |
+| Command argument/invocation behavior differs | Approved prompt fallback, explicit metadata, runtime limits reported |
+| Missing inventory causes deletion | Suppress all pruning while any source is missing |
+| New helpers change existing skills | Narrow integration changes and byte-identical pinned tests |
+| Recursive rules follow symlinks | Reject selected symlinks, including intermediate path components |
 
-## Open questions
-
-1. `uv.lock` is untracked. Should it be committed in commit 1, where the dependency set changes?
-   `TODOS.md` stays untracked unless you say otherwise.
+Owner directed continuation with native artifact reuse first. Normalize registered native Codex fragments; support explicit command-to-skill references rather than guessing equivalence.
